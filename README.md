@@ -205,21 +205,6 @@ configured
 [   10.123458] dwc2 fe980000.usb: USB 2.0 started, EHCI 1.00
 ```
 
-## Step 2.1: Aggiornamento sistematico
-
-```bash
-sudo apt update
-sudo apt upgrade -y
-sudo apt install -y \
-    git meson ninja-build cmake \
-    libavcodec-dev libavformat-dev libavutil-dev \
-    libusb-1.0-0-dev libjpeg-dev \
-    v4l-utils ffmpeg \
-    python3 python3-pip \
-    imagemagick curl wget \
-    libavdevice-dev
-```
-
 # 2: Installazione Software
 
 ## Step 2.1: Aggiornamento sistematico e installazione dipendenze
