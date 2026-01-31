@@ -87,67 +87,36 @@ max_framebuffers=2
 # Use the kernel's default instead.
 ```
 
-## Step 1.3: Modifica file di boot
+## Step 1.3: Modifica file di boot per supporto USB gadget mode
 
 ```bash
-# Aggiungi dwc2 a config.txt (se non già presente)
-if ! grep -q "dtoverlay=dwc2" /boot/firmware/config.txt; then
-    echo "dtoverlay=dwc2,dr_mode=peripheral" | sudo tee -a /boot/firmware/config.txt
-fi
-
-# Modifica cmdline.txt SOLO se non già modificato
-if ! grep -q "modules-load=dwc2,libcomposite" /boot/firmware/cmdline.txt; then
-    sudo sed -i 's/rootwait/rootwait modules-load=dwc2,libcomposite/' /boot/firmware/cmdline.txt
-fi
-
-# Verifica
-echo "=== Ultime righe config.txt ==="
-tail -3 /boot/firmware/config.txt
-echo ""
-echo "=== cmdline.txt modificato ==="
-cat /boot/firmware/cmdline.txt
-```
-
-**Output atteso:** 
-
-```bash
-=== cmdline.txt modificato ===
-console=serial0,115200 console=tty1 root=PARTUUID=4a3e915f-02 rootfstype=ext4 fsck.repair=yes rootwait modules-load=dwc2,libcomposite cfg80211.ieee80211_regdom=ITsalim@raspberry:~ $
-```
-
-```bash
-echo "=== Ultime righe config.txt ==="
-tail -5 /boot/firmware/config.txt
-```
-
-**Output atteso:** 
-
-```bash
-salim@raspberry:~ $ echo "=== Ultime recho "=== Ultime righe config.txt ==="
-tail -5 /boot/firmware/config.txt
-=== Ultime righe config.txt ===
-[cm5]
-dtoverlay=dwc2,dr_mode=host
-
-[all]
-enable_uart=1
-salim@raspberry:~ $
-```
-
-**Correzione della configurazione dwc2:**
-
-```bash
-# Prima, rimuoviamo la riga sbagliata nella sezione [cm5]
-sudo sed -i '/\[cm5\]/,/^\[/ s/dtoverlay=dwc2,dr_mode=host/#dtoverlay=dwc2,dr_mode=host/' /boot/firmware/config.txt
-
-# Ora aggiungiamo la riga corretta nella sezione [all]
+# Aggiungi dwc2 nella sezione [all] di config.txt
 if ! grep -q "dtoverlay=dwc2,dr_mode=peripheral" /boot/firmware/config.txt; then
     sudo sed -i '/^\[all\]/a dtoverlay=dwc2,dr_mode=peripheral' /boot/firmware/config.txt
 fi
 
-# Verifichiamo le modifiche
-echo "=== Config.txt dopo correzione ==="
-grep -A2 -B2 "dwc2\|\[all\]" /boot/firmware/config.txt
+# Aggiungi i moduli dwc2 e libcomposite a cmdline.txt
+if ! grep -q "modules-load=dwc2,libcomposite" /boot/firmware/cmdline.txt; then
+    sudo sed -i 's/rootwait/rootwait modules-load=dwc2,libcomposite/' /boot/firmware/cmdline.txt
+fi
+
+# Verifica le modifiche apportate
+echo "=== Verifica config.txt ==="
+grep -A1 "dtoverlay=dwc2" /boot/firmware/config.txt
+echo ""
+echo "=== Verifica cmdline.txt ==="
+cat /boot/firmware/cmdline.txt
+```
+
+**Output atteso:**
+
+```bash
+=== Verifica config.txt ===
+[all]
+dtoverlay=dwc2,dr_mode=peripheral
+
+=== Verifica cmdline.txt ===
+console=serial0,115200 console=tty1 root=PARTUUID=4a3e915f-02 rootfstype=ext4 fsck.repair=yes rootwait modules-load=dwc2,libcomposite cfg80211.ieee80211_regdom=IT
 ```
 
 ## Step 1.4: Riavvio del sistema
