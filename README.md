@@ -134,6 +134,8 @@ enable_uart=1
 salim@raspberry:~ $
 ```
 
+**Correzione della configurazione dwc2:**
+
 ```bash
 # Prima, rimuoviamo la riga sbagliata nella sezione [cm5]
 sudo sed -i '/\[cm5\]/,/^\[/ s/dtoverlay=dwc2,dr_mode=host/#dtoverlay=dwc2,dr_mode=host/' /boot/firmware/config.txt
