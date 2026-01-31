@@ -40,20 +40,6 @@ cat /boot/firmware/cmdline.txt
 **Output atteso:** 
 
 ```bash
-=== cmdline.txt attuale ===
-console=serial0,115200 console=tty1 root=PARTUUID=4a3e915f-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=IT
-```
-
-```bash
-echo "=== config.txt attuale ==="
-head -30 /boot/firmware/config.txt
-```
-
-**Output atteso:** 
-
-```bash
-salim@raspberry:~ $ echo "=== config.txt attuale ===" echo "=== config.txt attuale ==="
-head -30 /boot/firmware/config.txt
 === config.txt attuale ===
 # For more options and information see
 # http://rptl.io/configtxt
@@ -85,12 +71,15 @@ max_framebuffers=2
 
 # Don't have the firmware create an initial video= setting in cmdline.txt.
 # Use the kernel's default instead.
+
+=== cmdline.txt attuale ===
+console=serial0,115200 console=tty1 root=PARTUUID=4a3e915f-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=IT
 ```
 
 ## Step 1.3: Modifica file di boot per supporto USB gadget mode
 
 ```bash
-# Aggiungi dwc2 nella sezione [all] di config.txt
+# Aggiungi dwc2 nella sezione di config.txt
 if ! grep -q "dtoverlay=dwc2,dr_mode=peripheral" /boot/firmware/config.txt; then
     sudo sed -i '/^\[all\]/a dtoverlay=dwc2,dr_mode=peripheral' /boot/firmware/config.txt
 fi
