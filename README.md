@@ -204,3 +204,86 @@ configured
 [   10.123457] dwc2 fe980000.usb: new USB bus registered, assigned bus number 1
 [   10.123458] dwc2 fe980000.usb: USB 2.0 started, EHCI 1.00
 ```
+
+## Step 2.1: Aggiornamento sistematico
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+sudo apt install -y \
+    git meson ninja-build cmake \
+    libavcodec-dev libavformat-dev libavutil-dev \
+    libusb-1.0-0-dev libjpeg-dev \
+    v4l-utils ffmpeg \
+    python3 python3-pip \
+    imagemagick curl wget \
+    libavdevice-dev
+```
+
+# 2: Installazione Software
+
+## Step 2.1: Aggiornamento sistematico e installazione dipendenze
+
+**Descrizione:**
+Prima di iniziare con la configurazione della camera UVC, è fondamentale preparare il sistema installando tutti i pacchetti necessari. Questo passo garantisce che il Raspberry Pi abbia gli ultimi aggiornamenti di sicurezza e tutte le librerie di sviluppo per gestire video, USB e funzionalità UVC.
+
+**Azioni eseguite:**
+1. Aggiornamento della lista pacchetti e del sistema
+2. Installazione dei tool di sviluppo (git, meson, ninja, cmake)
+3. Installazione delle librerie multimediali (FFmpeg, libavcodec)
+4. Installazione delle librerie USB e JPEG
+5. Installazione di utilità di sistema e linguaggi di programmazione
+
+**Comandi da eseguire:**
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+sudo apt install -y \
+    git meson ninja-build cmake \
+    libavcodec-dev libavformat-dev libavutil-dev \
+    libusb-1.0-0-dev libjpeg-dev \
+    v4l-utils ffmpeg \
+    python3 python3-pip \
+    imagemagick curl wget \
+    libavdevice-dev
+```
+
+## Step 2.2: Caricamento modulo UVC e verifica
+
+**Descrizione:**
+
+```bash
+Dopo aver installato le dipendenze, carichiamo il modulo del kernel che abilita la funzionalità UVC (USB Video Class) e verifichiamo che tutti i componenti necessari siano stati caricati correttamente. Questo passo è fondamentale per trasformare il Raspberry Pi in un dispositivo USB gadget che può emulare una webcam.
+```
+
+**Comando 1 - Caricamento modulo UVC:**
+
+```bash
+sudo modprobe usb_f_uvc
+```
+
+**Comando 2 - Verifica dei moduli caricati:**
+
+```bash
+lsmod | grep -E "uvc|composite|gadget"
+```
+
+**Output atteso:**
+
+```bash
+usb_f_uvc              94208  0
+uvc                    12288  1 usb_f_uvc
+videobuf2_dma_sg       20480  1 usb_f_uvc
+videobuf2_vmalloc      12288  2 usb_f_uvc,bcm2835_v4l2
+videobuf2_v4l2         32768  6 usb_f_uvc,bcm2835_codec,rpi_hevc_dec,bcm2835_v4l2,v4l2_mem2mem,bcm2835_isp
+videodev              319488  7 usb_f_uvc,bcm2835_codec,rpi_hevc_dec,videobuf2_v4l2,bcm2835_v4l2,v4l2_mem2mem,bcm2835_isp
+videobuf2_common       73728  11 usb_f_uvc,bcm2835_codec,videobuf2_vmalloc,rpi_hevc_dec,videobuf2_dma_contig,videobuf2_v4l2,bcm2835_v4l2,videobuf2_dma_sg,v4l2_mem2mem,videobuf2_memops,bcm2835_isp
+libcomposite           81920  1 usb_f_uvc
+```
+
+**Comando 3 - Verifica modulo dwc2:**
+
+```bash
+lsmod | grep dwc2
+```
