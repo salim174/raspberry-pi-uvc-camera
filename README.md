@@ -317,11 +317,12 @@ drwxrwxr-x 2 salim salim 4096 Dec 28 21:44 src
 
 **Comandi da eseguire:**
 
-bash
+```bash
 #Pulisci build precedenti
 rm -rf build
 meson setup build
 ninja -C build
+```
 
 **Output atteso:**
 
