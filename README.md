@@ -272,3 +272,85 @@ libcomposite           81920  1 usb_f_uvc
 ```bash
 lsmod | grep dwc2
 ```
+
+## Step 2.3: Clone del repository uvc-gadget
+
+**Descrizione:** Cloniamo il repository ufficiale uvc-gadget, che contiene il software per emulare una camera UVC su Raspberry Pi.
+
+**Comandi da eseguire:**
+
+```bash
+cd ~
+git clone https://gitlab.freedesktop.org/camera/uvc-gadget.git
+cd uvc-gadget
+git checkout master  # Usa 'master' invece di 'main'
+ls -la
+```
+
+**Output atteso:**
+
+```bash
+Cloning into 'uvc-gadget'...
+remote: Enumerating objects: 650, done.
+remote: Counting objects: 100% (72/72), done.
+remote: Compressing objects: 100% (38/38), done.
+remote: Total 650 (delta 37), reused 65 (delta 34), pack-reused 578 (from 1)
+Receiving objects: 100% (650/650), 189.92 KiB | 692.00 KiB/s, done.
+Resolving deltas: 100% (398/398), done.
+total 44
+drwxrwxr-x 7 salim salim 4096 Dec 28 21:44 .
+drwx------ 5 salim salim 4096 Dec 28 21:44 ..
+drwxrwxr-x 8 salim salim 4096 Dec 28 21:44 .git
+-rw-rw-r-- 1 salim salim    6 Dec 28 21:44 .gitignore
+drwxrwxr-x 5 salim salim 4096 Dec 28 21:44 include
+drwxrwxr-x 3 salim salim 4096 Dec 28 21:44 lib
+-rw-rw-r-- 1 salim salim 1377 Dec 28 21:44 Makefile
+-rw-rw-r-- 1 salim salim 2693 Dec 28 21:44 meson.build
+-rw-rw-r-- 1 salim salim  524 Dec 28 21:44 README.md
+drwxrwxr-x 2 salim salim 4096 Dec 28 21:44 scripts
+drwxrwxr-x 2 salim salim 4096 Dec 28 21:44 src
+```
+
+## Step 2.4: Compilazione del software uvc-gadget
+
+**Descrizione:** Compiliamo il software uvc-gadget utilizzando il sistema de build Meson e Ninja.
+
+**Comandi da eseguire:**
+
+bash
+#Pulisci build precedenti
+rm -rf build
+meson setup build
+ninja -C build
+
+**Output atteso:**
+
+```bash
+The Meson build system
+Version: 1.7.0
+Source dir: /home/salim/uvc-gadget
+Build dir: /home/salim/uvc-gadget/build
+Build type: native build
+Project name: uvc-gadget
+Project version: 0.4.0
+C compiler for the host machine: cc (gcc 14.2.0 "cc (Debian 14.2.0-19) 14.2.0")
+C linker for the host machine: cc ld.bfd 2.44
+C++ compiler for the host machine: c++ (gcc 14.2.0 "c++ (Debian 14.2.0-19) 14.2.0")
+C++ linker for the host machine: c++ ld.bfd 2.44
+Host machine cpu family: aarch64
+Host machine cpu: aarch64
+Found pkg-config: YES (/usr/bin/pkg-config) 1.8.1
+Found CMake: /usr/bin/cmake (3.31.6)
+Run-time dependency libcamera found: NO (tried pkgconfig and cmake)
+Run-time dependency libjpeg found: YES 2.1.5
+Run-time dependency threads found: YES
+Configuring config.h using configuration
+Dependency uvcgadget found: YES 0.4.0 (overridden)
+Build targets in project: 2
+uvc-gadget 0.4.0
+  Versions
+    Sources: 0.4.0+6-04c18aa6
+Found ninja-1.12.1 at /usr/bin/ninja
+ninja: Entering directory `build'
+[16/16] Linking target src/uvc-gadget
+```
