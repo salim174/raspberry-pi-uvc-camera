@@ -392,3 +392,176 @@ Example usage:
     build/src/uvc-gadget g1/functions/uvc.1
     build/src/uvc-gadget musb-hdrc.0.auto
 ```
+
+# 3: Configurazione UVC con g_webcam
+
+Dopo aver tentato vari approcci con ConfigFS, abbiamo scoperto che la soluzione più semplice e funzionante è utilizzare il modulo kernel g_webcam, che configura automaticamente il Raspberry Pi come dispositivo UVC.
+
+## Step 3.1: Caricamento modulo g_webcam
+Descrizione: Dopo il riavvio del sistema, carichiamo il modulo kernel g_webcam che configura automaticamente il Raspberry Pi come dispositivo UVC compatibile.
+
+```bash
+sudo modprobe -r libcomposite usb_f_uvc 2>/dev/null || true
+sudo modprobe g_webcam
+```
+
+Verifica del caricamento:
+
+```bash
+lsmod | grep g_webcam
+```
+
+Output atteso:
+
+```bash
+g_webcam               16384  0
+libcomposite           81920  2 usb_f_uvc,g_webcam
+```
+
+## Step 3.2: Verifica del dispositivo video creato
+Descrizione: Verifichiamo che il modulo abbia creato il dispositivo video virtuale.
+
+```bash
+ls -la /dev/video* 2>/dev/null | tail -5
+```
+
+Verifica con v4l2-ctl:
+
+```bash
+v4l2-ctl --list-devices 2>/dev/null | head -10
+```
+
+Output atteso:
+
+```bash
+fe980000.usb (gadget.0):
+        /dev/video0
+```
+
+## Step 3.3: Creazione immagine di test
+
+Descrizione: Creiamo un'immagine di test in formato MJPEG che verrà trasmessa come stream video.
+
+```bash
+convert -size 640x480 gradient:blue-cyan \
+  -fill white -stroke black -strokewidth 2 \
+  -draw "rectangle 20,20 620,460" \
+  -fill black -pointsize 36 -gravity center \
+  -draw "text 0,-50 'UVC WEBCAM TEST'" \
+  -draw "text 0,0 'Raspberry Pi'" \
+  -draw "text 0,50 '640x480 MJPEG'" \
+  -draw "text 0,100 '$(date +"%H:%M:%S")'" \
+  -quality 90 ~/webcam_test.jpg
+echo "Immagine creata:"
+ls -lh ~/webcam_test.jpg
+```
+
+**Output atteso:**
+
+```bash
+Immagine creata:
+-rw-rw-r-- 1 salim salim 32K Dec 28 22:54 /home/salim/webcam_test.jpg
+```
+
+## Step 3.4: Avvio di uvc-gadget
+
+**Descrizione:** Avviamo il programma uvc-gadget per inviare l'immagine di test al dispositivo video virtuale.
+
+```bash
+#Ferma processi precedenti
+sudo pkill uvc-gadget 2>/dev/null || true
+sleep 1
+#Cerca il nome UDC corretto
+UDC_DEVICE=$(ls /sys/class/udc/)
+echo "UDC trovato: $UDC_DEVICE"
+#Avvia uvc-gadget
+cd ~/uvc-gadget
+sudo ./build/src/uvc-gadget -i ~/webcam_test.jpg $UDC_DEVICE &
+sleep 3
+#Verifica che il processo sia in esecuzione
+ps aux | grep uvc-gadget | grep -v grep
+```
+
+**Output atteso :**
+
+```bash
+root        1508  0.0  0.2   4528  2408 pts/0    S    22:54   0:00 sudo ./build/src/uvc-gadget -i /home/salim/webcam_test.jpg fe980000.usb
+root        1509  0.3  0.5  18080  5532 pts/0    Sl   22:54   0:00 ./build/src/uvc-gadget -i /home/salim/webcam_test.jpg fe980000.usb
+```
+
+## Step 3.5: Verifica finale
+
+**Descrizione:** Verifichiamo che il dispositivo video sia configurato correttamente e pronto per l'uso.
+
+```bash
+echo "=== Verifica dispositivo /dev/video0 ==="
+if [ -e /dev/video0 ]; then
+    v4l2-ctl -d /dev/video0 --info 2>/dev/null | head -10
+else
+    echo "/dev/video0 non trovato"
+fi
+
+echo -e "\n=== Messaggi del kernel recenti ==="
+dmesg | tail -5
+```
+
+**Output atteso:**
+
+```bash
+=== Verifica dispositivo /dev/video0 ===
+Driver Info:
+        Driver name      : g_uvc
+        Card type        : fe980000.usb
+        Bus info         : gadget.0
+        Driver version   : 6.12.47
+        Capabilities     : 0x84200002
+                Video Output
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps      : 0x04200002
+                Video Output
+                Streaming
+                Extended Pix Format
+=== Messaggi del kernel recenti ===
+[  363.519393] g_webcam gadget.0: uvc: uvc_function_bind()
+[  363.519698] g_webcam gadget.0: Webcam Video Gadget
+[  363.519709] g_webcam gadget.0: g_webcam ready
+[  363.519775] dwc2 fe980000.usb: bound driver g_webcam
+```
+
+## Step 3.6: Istruzioni per il collegamento al PC Procedura:
+
+Scollega il Raspberry Pi dall'alimentazione corrente
+
+Attendi 5 secondi
+
+Collega il Raspberry Pi al PC con un cavo USB-C DATI (non solo alimentazione)
+
+Su Windows:
+
+Apri "Gestione dispositivi"
+
+Cerca "USB Video Class Device" nella sezione "Telecamere" o "Dispositivi di acquisizione immagini"
+
+Prova con l'app Fotocamera di Windows, Zoom, Teams, OBS Studio, ecc.
+
+Comandi per riavviare il servizio (se necessario):
+
+```bash
+#Ferma uvc-gadget
+sudo pkill uvc-gadget
+#Ricarica il modulo g_webcam
+sudo modprobe -r g_webcam
+sudo modprobe g_webcam
+#Riavvia uvc-gadget
+cd ~/uvc-gadget
+sudo ./build/src/uvc-gadget -i ~/webcam_test.jpg &
+```
+
+Per un setup permanente (avvio automatico all'accensione), aggiungi al file /etc/rc.local (prima di exit 0):
+
+```bash
+modprobe g_webcam
+cd /home/salim/uvc-gadget && ./build/src/uvc-gadget -i /home/salim/webcam_test.jpg &
+```
