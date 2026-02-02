@@ -398,20 +398,20 @@ Example usage:
 Dopo aver tentato vari approcci con ConfigFS, abbiamo scoperto che la soluzione più semplice e funzionante è utilizzare il modulo kernel g_webcam, che configura automaticamente il Raspberry Pi come dispositivo UVC.
 
 ## Step 3.1: Caricamento modulo g_webcam
-Descrizione: Dopo il riavvio del sistema, carichiamo il modulo kernel g_webcam che configura automaticamente il Raspberry Pi come dispositivo UVC compatibile.
+**Descrizione:** Dopo il riavvio del sistema, carichiamo il modulo kernel g_webcam che configura automaticamente il Raspberry Pi come dispositivo UVC compatibile.
 
 ```bash
 sudo modprobe -r libcomposite usb_f_uvc 2>/dev/null || true
 sudo modprobe g_webcam
 ```
 
-Verifica del caricamento:
+**Verifica del caricamento:**
 
 ```bash
 lsmod | grep g_webcam
 ```
 
-Output atteso:
+**Output atteso:**
 
 ```bash
 g_webcam               16384  0
@@ -419,19 +419,19 @@ libcomposite           81920  2 usb_f_uvc,g_webcam
 ```
 
 ## Step 3.2: Verifica del dispositivo video creato
-Descrizione: Verifichiamo che il modulo abbia creato il dispositivo video virtuale.
+**Descrizione:** Verifichiamo che il modulo abbia creato il dispositivo video virtuale.
 
 ```bash
 ls -la /dev/video* 2>/dev/null | tail -5
 ```
 
-Verifica con v4l2-ctl:
+**Verifica con v4l2-ctl:**
 
 ```bash
 v4l2-ctl --list-devices 2>/dev/null | head -10
 ```
 
-Output atteso:
+**Output atteso:**
 
 ```bash
 fe980000.usb (gadget.0):
