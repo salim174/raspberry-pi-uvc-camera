@@ -440,7 +440,7 @@ fe980000.usb (gadget.0):
 
 ## Step 3.3: Creazione immagine di test
 
-Descrizione: Creiamo un'immagine di test in formato MJPEG che verrà trasmessa come stream video.
+**Descrizione:** Creiamo un'immagine di test in formato MJPEG che verrà trasmessa come stream video.
 
 ```bash
 convert -size 640x480 gradient:blue-cyan \
