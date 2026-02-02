@@ -355,3 +355,40 @@ Found ninja-1.12.1 at /usr/bin/ninja
 ninja: Entering directory `build'
 [16/16] Linking target src/uvc-gadget
 ```
+
+## Step 2.5: Verifica dell'eseguibile
+
+**Descrizione:** Verifichiamo che l'eseguibile sia stato creato correttamente e ne controlliamo le informazioni.
+
+**Comandi da eseguire:**
+
+```bash
+ls -lh build/src/uvc-gadget
+file build/src/uvc-gadget
+build/src/uvc-gadget --help | head -30
+```
+
+**Output atteso:**
+
+```bash
+-rwxrwxr-x 1 salim salim 77K Dec 28 21:44 build/src/uvc-gadget
+build/src/uvc-gadget: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=4b6a74293fe5f3f1bff5e6b1d445663dce58a95e, for GNU/Linux 3.7.0, with debug_info, not stripped
+Usage: build/src/uvc-gadget [options] <uvc device>
+Available options are
+ -d device      V4L2 source device
+ -i image       MJPEG image
+ -s directory   directory of slideshow images
+ -h             Print this help screen and exit
+ <uvc device>   UVC device instance specifier
+  For ConfigFS devices the <uvc device> parameter can take the form of a shortened
+  function specifier such as: 'uvc.0', or if multiple gadgets are configured, the
+  gadget name should be included to prevent ambiguity: 'g1/functions/uvc.0'.
+  For legacy g_webcam UVC instances, this parameter will identify the UDC that the
+  UVC function is bound to.
+  The parameter is optional, and if not provided the first UVC function on the first
+  gadget identified will be used.
+Example usage:
+    build/src/uvc-gadget uvc.1
+    build/src/uvc-gadget g1/functions/uvc.1
+    build/src/uvc-gadget musb-hdrc.0.auto
+```
