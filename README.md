@@ -548,138 +548,45 @@ Prova con l'app Fotocamera di Windows, Zoom, Teams, OBS Studio, ecc.
 
 Comandi per riavviare il servizio (se necessario):
 
-```bash
-#Ferma uvc-gadget
-sudo pkill uvc-gadget
-#Ricarica il modulo g_webcam
-sudo modprobe -r g_webcam
-sudo modprobe g_webcam
-#Riavvia uvc-gadget
-cd ~/uvc-gadget
-sudo ./build/src/uvc-gadget -i ~/webcam_test.jpg &
+## Step 3.7: Creazione del Servizio Systemd (Setup Permanente)
+
+**Descrizione:** Creiamo un file di servizio per fare in modo che la webcam si avvii automaticamente ogni volta che accendi il Raspberry Pi, senza dover digitare i comandi a mano. Questo metodo è più affidabile del vecchio rc.local.
+
+**1. Crea il file di servizio: Copia e incolla tutto questo blocco nel terminale:**
+
+```Bash
+sudo bash -c "cat <<EOF > /etc/systemd/system/uvc-webcam.service
+[Unit]
+Description=Raspberry Pi UVC Webcam Gadget
+After=network.target
+[Service]
+Type=simple
+# Carica il modulo kernel prima di avviare il programma
+ExecStartPre=/usr/sbin/modprobe g_webcam
+# Avvia uvc-gadget
+ExecStart=/home/$USER/uvc-gadget/build/src/uvc-gadget -i /home/$USER/webcam_test.jpg fe980000.usb
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+EOF"
 ```
 
-Per un setup permanente (avvio automatico all'accensione), aggiungi al file /etc/rc.local (prima di exit 0):
+**2. Attiva e avvia il servizio:**
 
-```bash
-modprobe g_webcam
-cd /home/salim/uvc-gadget && ./build/src/uvc-gadget -i /home/salim/webcam_test.jpg &
-```
-
-
-**Risoluzione Problemi**
-
-**Problema 1**: Nessun dispositivo rilevato su Windows
-Soluzione: Assicurati di usare un cavo USB-C che supporta la trasmissione dati (non solo alimentazione)
-
-**Problema 2**: Dispositivo con punto esclamativo in Gestione dispositivi
-Soluzione: Windows potrebbe aver bisogno del driver UVC standard (si installa automaticamente)
-
-**Problema 3**: Immagine non visibile
-Soluzione: Riavvia il Raspberry Pi e verifica il servizio:
-
-```bash
-sudo systemctl restart uvc-webcam.service
-sudo journalctl -u uvc-webcam.service -n 20
-```
-
-**Problema 4**: Uvc-gadget si ferma dopo l'avvio
-Descrizione: È normale! uvc-gadget aspetta che un client (PC) si colleghi e inizi a richiedere frame
-
-**Verifica**: Collega il PC e controlla i log:
-
-```bash
-sudo journalctl -u uvc-webcam.service -f
-```
-
-Dovresti vedere richieste di controllo UVC quando colleghi il PC.
-
-📝 Log di Funzionante
-
-**Output atteso:**
-
-```bash
-using jpg video source
-Device /dev/video0 opened: fe980000.usb (gadget.0).
-bRequestType a1 bRequest 86 wValue 0400 wIndex 0100 wLength 0001
-control request (req GET_INFO cs GAIN)
-... (altre richieste di controllo) ...
-Setting format to 0x47504a4d 640x360
-=== Setting frame rate to 15 fps
-Starting video stream.
-/dev/video0: 4 buffers requested.
-/dev/video0: buffer 0 mapped at address 0x7fb81bf000.
-... (streaming attivo) ...
-```
-
-**⚙️ Configurazioni Avanzate**
-
-Modificare risoluzione video
-Per cambiare la risoluzione dell'immagine di test:
-
-```bash
-#Crea immagine 1280x720
-convert -size 1280x720 gradient:blue-cyan \
-  -fill white -stroke black -strokewidth 2 \
-  -draw "rectangle 40,40 1240,680" \
-  -fill black -pointsize 48 -gravity center \
-  -draw "text 0,-75 'UVC WEBCAM TEST'" \
-  -draw "text 0,0 'Raspberry Pi'" \
-  -draw "text 0,75 '1280x720 MJPEG'" \
-  -draw "text 0,150 '$(date +"%H:%M:%S")'" \
-  -quality 90 ~/webcam_test_hd.jpg
-```
-
-**Aggiornare il servizio systemd con nuova immagine**
-
-```bash
-sudo systemctl stop uvc-webcam.service
-sudo sed -i 's|/home/salim/webcam_test.jpg|/home/salim/webcam_test_hd.jpg|' /etc/systemd/system/uvc-webcam.service
+```Bash
+#Ricarica la lista dei servizi
 sudo systemctl daemon-reload
+
+#Abilita il servizio all'avvio automatico
+sudo systemctl enable uvc-webcam.service
+
+#Avvia il servizio immediatamente
 sudo systemctl start uvc-webcam.service
 ```
-**Monitorare lo stato in tempo reale**
 
-```bash
-#Monitora i log del servizio
-sudo journalctl -u uvc-webcam.service -f
-#Verifica processi
-watch -n 1 "ps aux | grep uvc-gadget | grep -v grep"
-#Verifica dispositivi video
-watch -n 1 "v4l2-ctl --list-devices 2>/dev/null"
-```
-**Setup Permanente**
-Una volta verificato che tutto funziona:
-Il servizio systemd si avvierà automaticamente ad ogni boot
-Non è necessario alcun intervento manuale dopo il collegamento al PC
-Per fermare temporaneamente il servizio:
+**3. Verifica lo stato:**
 
-```bash
-sudo systemctl stop uvc-webcam.service
-```
-
-**Per riavviare**:
-
-```bash
-sudo systemctl restart uvc-webcam.service
-```
-
-**Verifica Finale**
-Prima di considerare il setup completato, esegui:
-
-```bash
-echo "=== VERIFICA FINALE ==="
-echo "1. Servizio attivo:"
-sudo systemctl is-active uvc-webcam.service
-echo -e "\n2. Stato servizio:"
-sudo systemctl status uvc-webcam.service --no-pager -l | head -20
-echo -e "\n3. Dispositivo video disponibile:"
-if [ -e /dev/video0 ]; then
-    echo "✅ /dev/video0 presente"
-    v4l2-ctl -d /dev/video0 --info 2>/dev/null | grep "Card type"
-else
-    echo "❌ /dev/video0 non trovato"
-fi
-echo -e "\n4. UDC disponibile:"
-ls /sys/class/udc/ 2>/dev/null && echo "✅ UDC configurato" || echo "❌ UDC non trovato"
+```Bash
+sudo systemctl status uvc-webcam.service
 ```
