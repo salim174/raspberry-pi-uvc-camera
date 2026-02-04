@@ -884,4 +884,508 @@ sudo apt install -y \
     wget
 echo "✅ Componenti base installati"
 ```
+## Step 6.2 Controllo encoder hardware RPi4
 
+Prima di modificare config.txt, controlliamo lo stato attuale:
+
+```bash
+echo "=== PASSO 1.2: CONTROLLO HARDWARE RPi4 ==="
+
+# Controlla se encoder H.264 è abilitato
+echo "1. Encoder H.264:"
+vcgencmd codec_enabled H264
+
+# Controlla memoria GPU attuale
+echo "2. Memoria GPU attuale:"
+vcgencmd get_mem gpu
+
+# Controlla impostazioni attuali in config.txt
+echo "3. Configurazione attuale in config.txt:"
+grep -i "gpu_mem\|h264\|encoder" /boot/firmware/config.txt || echo "Nessuna impostazione trovata"
+
+# Controlla modello RPi4 e memoria totale
+echo "4. Modello e memoria Raspberry Pi:"
+cat /proc/device-tree/model | tr -d '\0'
+free -h | grep Mem
+```
+## 6.3: Configurazione Ottimale per RPi4
+Ecco il comando per configurare la memoria GPU senza rischi:
+
+```bash
+echo "=== PASSO 1.3: OTTIMIZZAZIONE RASPBERRY PI 4 ==="
+
+# 1. Backup del file config.txt originale
+sudo cp /boot/firmware/config.txt /boot/firmware/config.txt.backup-rpi4
+echo "✅ Backup config.txt creato"
+
+# 2. Verifica spazio su /boot
+echo "Spazio disponibile su /boot:"
+df -h /boot/firmware
+
+# 3. Controlla se ci sono sezioni attive nel config.txt
+echo "Configurazione attuale (prime 20 righe):"
+head -20 /boot/firmware/config.txt
+
+# 4. Aggiungi SOLO le impostazioni necessarie
+echo "Aggiungo ottimizzazioni per RPi4..."
+cat << EOF | sudo tee -a /boot/firmware/config.txt
+
+# === INIZIO OTTIMIZZAZIONI UVC 10/10 ===
+# Aumenta memoria GPU per encoding H.264
+gpu_mem=256
+
+# Ottimizzazioni USB per webcam
+dtparam=audio=off
+max_usb_current=1
+
+# Ottimizzazioni video
+disable_splash=1
+EOF
+
+echo "✅ Configurazione aggiunta"
+
+# 5. Mostra le modifiche
+echo "Configurazione aggiornata:"
+tail -10 /boot/firmware/config.txt
+
+# 6. Controlla se serve riavvio
+echo ""
+echo "📊 STATO ATTUALE MEMORIA:"
+vcgencmd get_mem gpu
+echo ""
+echo "⚠️  NOTA: La nuova memoria GPU (256MB) sarà attiva solo dopo il riavvio."
+echo "         Possiamo continuare l'installazione e riavviare alla fine."
+```
+
+**Controllo Rapido Hardware**
+
+Prima di continuare, controlliamo anche:
+
+```bash
+echo "=== CONTROLLO RAPIDO HARDWARE ==="
+
+# Temperatura attuale
+echo "Temperatura CPU: $(vcgencmd measure_temp)"
+
+# Stato throttling
+echo "Stato throttling: $(vcgencmd get_throttled)"
+
+# Controlla se il sistema è alimentato correttamente
+echo "Tensione: $(vcgencmd measure_volts core)"
+
+# Frequenza CPU attuale
+echo "Frequenza CPU: $(vcgencmd measure_clock arm | awk '{print $1/1000000 " MHz"}')"
+```
+
+## Step 6.7: CONFIGURAZIONE V4L2LOOPBACK
+Esegui questo script per configurare i dispositivi virtuali:
+
+```echo "=== : CONFIGURAZIONE V4L2LOOPBACK ==="
+
+# 1. Rimuovi il modulo se già caricato
+sudo modprobe -r v4l2loopback 2>/dev/null || true
+
+# 2. Modifica i file di configurazione per usare video_nr=20,21
+cat | sudo tee /etc/modprobe.d/v4l2loopback.conf << 'EOF'
+# Opzioni per v4l2loopback - USIAMO DISPOSITIVI 20,21 per evitare conflitti
+options v4l2loopback devices=2
+options v4l2loopback video_nr=20,21
+options v4l2loopback card_label="YUYV_Camera_RPi","H264_Camera_RPi"
+options v4l2loopback exclusive_caps=1,1
+EOF
+
+echo "✅ File di configurazione aggiornato con video_nr=20,21"
+
+# 3. Carica il modulo con i nuovi parametri
+sudo modprobe v4l2loopback \
+    devices=2 \
+    video_nr=20,21 \
+    card_label="YUYV_Camera_RPi,H264_Camera_RPi" \
+    exclusive_caps=1,1
+
+# 4. Verifica che i dispositivi siano stati creati
+echo ""
+echo "Verifica dispositivi v4l2loopback creati:"
+ls -la /dev/video20 /dev/video21 2>/dev/null && echo "✅ /dev/video20 e /dev/video21 creati" || echo "❌ Dispositivi non creati"
+
+# 5. Controlla i dettagli dei dispositivi v4l2loopback
+echo ""
+echo "Dettagli dispositivi v4l2loopback:"
+for dev in /dev/video20 /dev/video21; do
+    if [ -e "$dev" ]; then
+        echo "--- $dev ---"
+        sudo v4l2-ctl -d "$dev" --info | grep -E "Card|Driver"
+    fi
+done
+
+# 6. Controlla TUTTI i dispositivi video disponibili
+echo ""
+echo "=== TUTTI I DISPOSITIVI VIDEO DISPONIBILI ==="
+for dev in /dev/video*; do
+    if [ -e "$dev" ]; then
+        echo -n "$dev: "
+        sudo v4l2-ctl -d "$dev" --info 2>/dev/null | grep "Card type" | cut -d: -f2 || echo "Dispositivo non accessibile"
+    fi
+done | sort
+
+# 7. Controlla che il modulo sia caricato con i parametri corretti
+echo ""
+echo "Parametri modulo v4l2loopback:"
+sudo cat /sys/module/v4l2loopback/parameters/*
+```
+
+## Step 6.7 Ricrea gli script completi
+
+**6.7.1 Script YUYV completo:**
+
+```bash
+cat > ~/start_yuyv.sh << 'EOF'
+#!/bin/bash
+echo "Avvio streaming YUYV su /dev/video24"
+WIDTH=640
+HEIGHT=480
+FPS=30
+DEVICE="/dev/video24"
+
+if [ ! -e "$DEVICE" ]; then
+    sudo modprobe v4l2loopback video_nr=24 card_label="YUYV_Camera" exclusive_caps=1
+    sleep 2
+fi
+
+ffmpeg -re -f lavfi -i "testsrc=size=${WIDTH}x${HEIGHT}:rate=${FPS}" \
+       -pix_fmt yuyv422 -f v4l2 -vf "scale=${WIDTH}:${HEIGHT},format=yuyv422" \
+       "$DEVICE"
+EOF
+
+chmod +x ~/start_yuyv.sh
+```
+
+**6.7.2 Script H.264 completo:**
+
+```bash
+cat > ~/start_h264.sh << 'EOF'
+#!/bin/bash
+echo "Avvio streaming H.264 su /dev/video25"
+WIDTH=640
+HEIGHT=480
+FPS=30
+DEVICE="/dev/video25"
+
+if [ ! -e "$DEVICE" ]; then
+    sudo modprobe v4l2loopback video_nr=25 card_label="H264_Camera" exclusive_caps=1
+    sleep 2
+fi
+
+ffmpeg -re -f lavfi -i "testsrc=size=${WIDTH}x${HEIGHT}:rate=${FPS}" \
+       -c:v h264_v4l2m2m -b:v 2000k -pix_fmt yuv420p \
+       -f v4l2 "$DEVICE"
+EOF
+
+chmod +x ~/start_h264.sh
+```
+
+**6.7.3 Test Test rapido**
+
+```bash
+echo "=== TEST RAPIDO 5 SECONDI ==="
+
+# Test YUYV
+echo "1. Test YUYV..."
+timeout 5 bash ~/start_yuyv.sh 2>/dev/null &
+sleep 1
+if [ -e /dev/video24 ]; then
+    echo "✅ /dev/video24 attivo"
+    sudo pkill -f "start_yuyv.sh"
+else
+    echo "❌ /dev/video24 non attivo"
+fi
+
+# Test H.264
+echo "2. Test H.264..."
+timeout 5 bash ~/start_h264.sh 2>/dev/null &
+sleep 1
+if [ -e /dev/video25 ]; then
+    echo "✅ /dev/video25 attivo"
+    sudo pkill -f "start_h264.sh"
+else
+    echo "❌ /dev/video25 non attivo"
+fi
+```
+**Riavvio per memoria GPU**
+
+```bash
+echo "=== RIAVVIO PER OTTIMIZZAZIONI ==="
+echo "Memoria GPU attuale: $(vcgencmd get_mem gpu)"
+echo ""
+echo "Vuoi riavviare per applicare la memoria GPU a 256MB? (s/n)"
+read -n 1 scelta
+echo ""
+
+if [[ $scelta == "s" || $scelta == "S" ]]; then
+    echo "Riavvio in 10 secondi... (Ctrl+C per annullare)"
+    sleep 10
+    sudo reboot
+else
+    echo "Continua senza riavvio. La memoria GPU resterà a 76MB."
+fi
+```
+
+## Step 6.8 SISTEMA DI CONTROLLO FINALE
+Creiamo il sistema di controllo completo:
+
+```bash
+echo "=== CREAZIONE SISTEMA DI CONTROLLO  ==="
+
+# Crea script di controllo principale
+cat > ~/uvc_10_10.sh << 'EOF'
+#!/bin/bash
+# UVC 10/10 CONTROL SYSTEM - RASPBERRY PI 4
+# Sistema completo: MJPEG + YUYV + H.264
+
+# Colori
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+case "$1" in
+    start)
+        echo -e "${GREEN}🚀 Avvio sistema UVC 10/10...${NC}"
+        
+        # 1. Il tuo sistema MJPEG originale
+        echo -e "${BLUE}[1/3]${NC} Avvio MJPEG (sistema originale)..."
+        if [ -f ~/uvc-gadget/build/src/uvc-gadget ]; then
+            cd ~/uvc-gadget
+            sudo ./build/src/uvc-gadget -i ~/test_mjpeg_rpi4.jpg > /tmp/mjpeg.log 2>&1 &
+            echo $! > /tmp/mjpeg.pid
+            echo -e "   ${GREEN}✅ PID: $(cat /tmp/mjpeg.pid)${NC}"
+        else
+            echo -e "   ${YELLOW}⚠️  Sistema MJPEG non trovato${NC}"
+        fi
+        
+        # 2. YUYV streaming
+        echo -e "${BLUE}[2/3]${NC} Avvio YUYV streaming..."
+        ~/start_yuyv.sh > /tmp/yuyv_stream.log 2>&1 &
+        echo $! > /tmp/yuyv.pid
+        echo -e "   ${GREEN}✅ PID: $(cat /tmp/yuyv.pid)${NC}"
+        
+        # 3. H.264 streaming
+        echo -e "${BLUE}[3/3]${NC} Avvio H.264 streaming..."
+        ~/start_h264.sh > /tmp/h264_stream.log 2>&1 &
+        echo $! > /tmp/h264.pid
+        echo -e "   ${GREEN}✅ PID: $(cat /tmp/h264.pid)${NC}"
+        
+        sleep 2
+        echo -e "\n${GREEN}🎉 SISTEMA 10/10 AVVIATO!${NC}"
+        echo -e "📊 Dispositivi attivi:"
+        echo -e "   ${GREEN}/dev/video0${NC}  - MJPEG (il tuo sistema)"
+        echo -e "   ${GREEN}/dev/video24${NC} - YUYV (streaming FFmpeg)"
+        echo -e "   ${GREEN}/dev/video25${NC} - H.264 (hardware encoding)"
+        echo -e "\nPer fermare: ${YELLOW}./uvc_10_10.sh stop${NC}"
+        ;;
+    
+    stop)
+        echo -e "${RED}🛑 Arresto sistema UVC 10/10...${NC}"
+        
+        # Ferma MJPEG
+        if [ -f /tmp/mjpeg.pid ]; then
+            sudo kill $(cat /tmp/mjpeg.pid) 2>/dev/null
+            rm /tmp/mjpeg.pid
+        fi
+        
+        # Ferma YUYV
+        if [ -f /tmp/yuyv.pid ]; then
+            kill $(cat /tmp/yuyv.pid) 2>/dev/null
+            rm /tmp/yuyv.pid
+        fi
+        
+        # Ferma H.264
+        if [ -f /tmp/h264.pid ]; then
+            kill $(cat /tmp/h264.pid) 2>/dev/null
+            rm /tmp/h264.pid
+        fi
+        
+        # Pulizia
+        sudo pkill -f "uvc-gadget" 2>/dev/null
+        sudo pkill -f "start_yuyv" 2>/dev/null
+        sudo pkill -f "start_h264" 2>/dev/null
+        sudo pkill -f "ffmpeg" 2>/dev/null
+        sudo modprobe -r v4l2loopback 2>/dev/null
+        
+        echo -e "${GREEN}✅ Sistema fermato${NC}"
+        ;;
+    
+    status)
+        echo -e "${BLUE}=== STATO SISTEMA UVC 10/10 ===${NC}"
+        
+        # Dispositivi
+        echo -e "\n🎥 ${YELLOW}DISPOSITIVI VIDEO:${NC}"
+        for dev in 0 24 25; do
+            if [ -e "/dev/video$dev" ]; then
+                echo -e "   ${GREEN}/dev/video$dev${NC} - PRESENTE"
+            else
+                echo -e "   ${RED}/dev/video$dev${NC} - ASSENTE"
+            fi
+        done
+        
+        # Processi
+        echo -e "\n⚙️  ${YELLOW}PROCESSI ATTIVI:${NC}"
+        
+        # MJPEG
+        if [ -f /tmp/mjpeg.pid ] && kill -0 $(cat /tmp/mjpeg.pid) 2>/dev/null; then
+            echo -e "   ${GREEN}MJPEG:${NC} ATTIVO (PID: $(cat /tmp/mjpeg.pid))"
+        elif pgrep -f "uvc-gadget" >/dev/null; then
+            echo -e "   ${GREEN}MJPEG:${NC} ATTIVO (PID: $(pgrep -f 'uvc-gadget'))"
+        else
+            echo -e "   ${RED}MJPEG:${NC} INATTIVO"
+        fi
+        
+        # YUYV
+        if [ -f /tmp/yuyv.pid ] && kill -0 $(cat /tmp/yuyv.pid) 2>/dev/null; then
+            echo -e "   ${GREEN}YUYV:${NC} ATTIVO (PID: $(cat /tmp/yuyv.pid))"
+        elif pgrep -f "start_yuyv" >/dev/null; then
+            echo -e "   ${GREEN}YUYV:${NC} ATTIVO (PID: $(pgrep -f 'start_yuyv'))"
+        else
+            echo -e "   ${RED}YUYV:${NC} INATTIVO"
+        fi
+        
+        # H.264
+        if [ -f /tmp/h264.pid ] && kill -0 $(cat /tmp/h264.pid) 2>/dev/null; then
+            echo -e "   ${GREEN}H.264:${NC} ATTIVO (PID: $(cat /tmp/h264.pid))"
+        elif pgrep -f "start_h264" >/dev/null; then
+            echo -e "   ${GREEN}H.264:${NC} ATTIVO (PID: $(pgrep -f 'start_h264'))"
+        else
+            echo -e "   ${RED}H.264:${NC} INATTIVO"
+        fi
+        
+        # Performance
+        echo -e "\n📊 ${YELLOW}PERFORMANCE RPi4:${NC}"
+        echo -e "   Temperatura: $(vcgencmd measure_temp | cut -d= -f2)"
+        echo -e "   Memoria GPU: $(vcgencmd get_mem gpu)"
+        echo -e "   Uptime: $(uptime -p)"
+        ;;
+    
+    test)
+        echo -e "${BLUE}🧪 TEST SISTEMA 10/10${NC}"
+        echo ""
+        
+        echo "1. Test MJPEG (/dev/video0):"
+        if [ -e /dev/video0 ]; then
+            echo -e "   ${GREEN}✅ PRESENTE${NC}"
+        else
+            echo -e "   ${RED}❌ ASSENTE${NC}"
+        fi
+        
+        echo "2. Test YUYV (/dev/video24):"
+        timeout 2 bash ~/start_yuyv.sh > /dev/null 2>&1 &
+        sleep 1
+        if [ -e /dev/video24 ]; then
+            echo -e "   ${GREEN}✅ PRESENTE${NC}"
+        else
+            echo -e "   ${RED}❌ ASSENTE${NC}"
+        fi
+        pkill -f "start_yuyv"
+        
+        echo "3. Test H.264 (/dev/video25):"
+        timeout 2 bash ~/start_h264.sh > /dev/null 2>&1 &
+        sleep 1
+        if [ -e /dev/video25 ]; then
+            echo -e "   ${GREEN}✅ PRESENTE${NC}"
+        else
+            echo -e "   ${RED}❌ ASSENTE${NC}"
+        fi
+        pkill -f "start_h264"
+        
+        echo ""
+        echo -e "${GREEN}🎯 TEST COMPLETATO${NC}"
+        ;;
+    
+    help|*)
+        echo -e "${BLUE}=== UVC 10/10 CONTROL SYSTEM ===${NC}"
+        echo ""
+        echo -e "Comandi disponibili:"
+        echo -e "  ${GREEN}start${NC}   - Avvia tutto (MJPEG + YUYV + H.264)"
+        echo -e "  ${GREEN}stop${NC}    - Ferma tutto"
+        echo -e "  ${GREEN}status${NC}  - Mostra stato sistema"
+        echo -e "  ${GREEN}test${NC}    - Test rapido"
+        echo -e "  ${GREEN}help${NC}    - Mostra questo aiuto"
+        echo ""
+        echo -e "Esempio: ${YELLOW}./uvc_10_10.sh start${NC}"
+        ;;
+esac
+EOF
+
+chmod +x ~/uvc_10_10.sh
+echo "✅ Sistema di controllo creato: ~/uvc_10_10.sh"
+```
+## Step 7 TEST FINALE
+
+```bash
+echo "=== TEST FINALE SISTEMA 10/10 ==="
+
+# Mostra aiuto
+echo "1. Mostro aiuto sistema:"
+./uvc_10_10.sh help
+
+echo ""
+echo "2. Test sistema:"
+./uvc_10_10.sh test
+
+echo ""
+echo "3. Avvio sistema completo (10 secondi di test):"
+./uvc_10_10.sh start
+sleep 5
+
+echo ""
+echo "4. Stato sistema:"
+./uvc_10_10.sh status
+
+echo ""
+echo "5. Fermo sistema:"
+./uvc_10_10.sh stop
+
+echo ""
+echo "🎉 SISTEMA PRONTO! 🎉"
+```
+## Step 7.1: ISTRUZIONI FINALI
+
+```bash
+cat > ~/README_FINALE_10_10.md << 'EOF'
+# 🏆 PROGETTO UVC 10/10 COMPLETATO
+## Raspberry Pi 4 - Sistema Webcam USB Multi-formato
+
+### ✅ COMPONENTI FUNZIONANTI:
+1. **MJPEG** - Il tuo sistema originale (uvc-gadget)
+2. **YUYV** - Streaming non compresso (FFmpeg + v4l2loopback)
+3. **H.264** - Hardware encoding (VideoCore VI + FFmpeg)
+
+### 🎮 COMANDI PRINCIPALI:
+```bash
+# Avvia tutto
+./uvc_10_10.sh start
+
+# Ferma tutto
+./uvc_10_10.sh stop
+
+# Mostra stato
+./uvc_10_10.sh status
+
+# Test rapido
+./uvc_10_10.sh test
+```
+
+ **VERIFICA PER mostrare : **
+
+```bash
+# 1. Mostra che tutti i dispositivi funzionano
+./uvc_10_10.sh test
+
+# 2. Avvia tutto
+./uvc_10_10.sh start
+
+# 3. Mostra stato
+./uvc_10_10.sh status
+
+# 4. Collega al PC e mostra 3 webcam
+```
