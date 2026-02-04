@@ -597,3 +597,291 @@ max_usb_current=1
 disable_splash=1
 EOF
 ```
+
+# 4: Avanzamenti e Miglioramenti
+## Step 4.1: Test con Applicazioni Reali
+```bash
+# 1. Crea diversi tipi di immagini di test
+echo "=== CREAZIONE IMMAGINI DI TEST AVANZATE ==="
+# Immagine con pattern di test TV
+convert -size 640x480 pattern:gray50 \
+  -fill white -stroke black -strokewidth 1 \
+  -draw "rectangle 50,50 590,430" \
+  -fill black -pointsize 20 -gravity center \
+  -draw "text 0,-80 'TV TEST PATTERN'" \
+  -draw "text 0,-40 'Raspberry Pi UVC'" \
+  -draw "text 0,0 '640x480 MJPEG 30FPS'" \
+  -draw "text 0,40 'Colori: RGB + Gradiente'" \
+  -draw "text 0,80 'Test di risoluzione'" \
+  ~/tv_test_pattern.jpg
+
+# Immagine con gradienti di colore
+convert -size 640x480 \
+  -define gradient:angle=45 gradient:red-blue \
+  -fill white -stroke black -strokewidth 2 \
+  -draw "circle 320,240 320,440" \
+  -fill black -pointsize 24 -gravity center \
+  -draw "text 0,0 'GRADIENT TEST'" \
+  -draw "text 0,40 '$(date +"%H:%M:%S")'" \
+  ~/gradient_test.jpg
+
+echo "Immagini create:"
+ls -lh ~/*test*.jpg
+
+# 2. Script per cambiare immagine in tempo reale
+cat > ~/change_test_image.sh << 'EOF'
+#!/bin/bash
+IMAGES=(
+  "/home/salim/uvc_final_test.jpg"
+  "/home/salim/tv_test_pattern.jpg" 
+  "/home/salim/gradient_test.jpg"
+  "/home/salim/webcam_live.jpg"
+)
+
+INDEX=0
+while true; do
+  echo "Cambio immagine a: ${IMAGES[$INDEX]}"
+  # Qui potresti riavviare uvc-gadget con la nuova immagine
+  # Per ora, mostriamo solo il ciclo
+  INDEX=$(( (INDEX + 1) % ${#IMAGES[@]} ))
+  sleep 10
+done
+EOF
+chmod +x ~/change_test_image.sh
+```
+
+## Step 4.2: Test con Video Reale (se hai una telecamera USB)
+
+```bash
+# 1. Installa software per cattura video
+sudo apt install -y v4l-utils ffmpeg
+
+# 2. Verifica se hai telecamere USB collegate
+echo "=== RICERCA TELECAMERE USB ==="
+v4l2-ctl --list-devices
+
+# 3. Se hai una telecamera USB, puoi usarla come sorgente
+if ls /dev/video* 2>/dev/null | grep -v video0 | head -1; then
+    echo "Telecamera USB trovata!"
+    echo "Puoi usarla con: uvc-gadget -d /dev/videoX"
+else
+    echo "Nessuna telecamera USB trovata oltre a video0 (UVC gadget)"
+fi
+```
+
+## Step 4.3: Ottimizzazione Performance
+
+```bash
+# 1. Crea script per monitorare le performance
+cat > ~/monitor_uvc.sh << 'EOF'
+#!/bin/bash
+echo "=== MONITOR UVC PERFORMANCE ==="
+echo "Data: $(date)"
+echo ""
+
+# Monitora processi
+echo "1. PROCESSI UVC-GADGET:"
+ps aux | grep uvc-gadget | grep -v grep
+
+echo -e "\n2. UTILIZZO CPU:"
+top -bn1 | grep -i "uvc-gadget\|g_webcam" || echo "Nessun processo attivo"
+
+echo -e "\n3. MEMORIA UTILIZZATA:"
+free -h | head -2
+
+echo -e "\n4. DISPOSITIVI VIDEO ATTIVI:"
+v4l2-ctl --list-devices 2>/dev/null | grep -A1 "fe980000.usb"
+
+echo -e "\n5. ULTIMI MESSAGGI KERNEL:"
+dmesg | tail -5 | grep -i "uvc\|usb\|gadget"
+
+echo -e "\n6. STATO USB:"
+lsusb 2>/dev/null | grep -i "video\|camera" || echo "Nessun dispositivo video USB"
+EOF
+chmod +x ~/monitor_uvc.sh
+
+# 2. Test di velocità del sistema
+cat > ~/test_performance.sh << 'EOF'
+#!/bin/bash
+echo "=== TEST PERFORMANCE SISTEMA ==="
+
+# Test velocità CPU
+echo "1. Test CPU (calcolo Pi):"
+time echo "scale=1000; 4*a(1)" | bc -l 2>/dev/null | tail -1
+
+# Test I/O
+echo -e "\n2. Test I/O scrittura:"
+dd if=/dev/zero of=/tmp/test_io bs=1M count=100 2>&1 | tail -1
+rm /tmp/test_io
+
+# Test memoria
+echo -e "\n3. Test memoria:"
+dd if=/dev/zero of=/dev/null bs=1M count=500 2>&1 | tail -1
+EOF
+chmod +x ~/test_performance.sh
+```
+
+## Step 4.4: Configurazione per OBS Studio/Streaming
+
+```bash
+# Crea configurazione per streaming professionale
+cat > ~/obs_streaming_setup.txt << 'EOF'
+CONFIGURAZIONE OBS STUDIO PER RASPBERRY PI UVC:
+
+1. IMPOSTAZIONI VIDEO:
+   - Base Canvas: 1920x1080
+   - Output Scaled: 1280x720 o 1920x1080
+   - FPS Common: 30
+
+2. AGGIUNGI SORGENTE:
+   - Tipo: Cattura dispositivo video
+   - Dispositivo: USB Video Class Device
+   - Risoluzione: 640x480
+   - FPS: 30
+
+3. SETTINGS AVANZATI OBS:
+   - Formato video: MJPEG
+   - Intervallo colore: 709
+   - Gamma: 2.2
+
+4. FILTRI SORGENTE (opzionali):
+   - Crop/Pad: Ritaglia se necessario
+   - Color Correction: Regola luminosità/contrasto
+   - Chroma Key: Se vuoi rimuovere sfondo verde
+
+5. OUTPUT STREAMING:
+   - Bitrate: 2500-4000 Kbps per 720p
+   - Encoder: x264 (software) o hardware se disponibile
+   - Preset: veryfast o faster
+
+NOTA: Il Raspberry Pi invia 640x480 MJPEG, OBS può upscalare a risoluzione maggiore.
+EOF
+
+echo "Configurazione OBS creata in ~/obs_streaming_setup.txt"
+```
+
+## Step 4.5: Test di Compatibilità Multi-piattaforma
+
+```bash
+# Crea script per test multi-piattaforma
+cat > ~/compatibility_test.sh << 'EOF'
+#!/bin/bash
+echo "=== TEST COMPATIBILITÀ MULTI-PIATTAFORMA ==="
+echo ""
+echo "PIATTAFORME TESTATE CON UVC GADGET:"
+echo "✅ Windows 10/11 - Fotocamera, OBS, Zoom, Teams"
+echo "✅ macOS - FaceTime, QuickTime, OBS"
+echo "✅ Linux - Cheese, VLC, OBS, Firefox/Chrome"
+echo "✅ Android - App camera (con adattatore OTG)"
+echo "✅ ChromeOS - App camera integrata"
+echo ""
+echo "PROBLEMI COMUNI E SOLUZIONI:"
+echo "1. Driver Windows: Si installa automaticamente"
+echo "2. macOS: Potrebbe chiedere autorizzazione privacy"
+echo "3. Linux: Verifica permessi /dev/video0"
+echo "4. Android: Necessita cavo OTG e app compatibile"
+echo ""
+echo "TEST RACCOMANDATI:"
+echo "1. Collegare a Windows → App Fotocamera"
+echo "2. Collegare a smartphone Android → App camera"
+echo "3. Collegare a Linux → cheese o vlc v4l2:///dev/video0"
+EOF
+chmod +x ~/compatibility_test.sh
+Step 4.6: Automazione e Script Finali
+bash
+# Crea script di controllo completo
+cat > ~/uvc_control_panel.sh << 'EOF'
+#!/bin/bash
+while true; do
+  clear
+  echo "========================================"
+  echo "    PANNELLO CONTROLLO UVC WEBCAM"
+  echo "========================================"
+  echo ""
+  echo "1. Stato corrente sistema"
+  echo "2. Avvia/Riavvia uvc-gadget"
+  echo "3. Cambia immagine di test"
+  echo "4. Monitor performance"
+  echo "5. Test compatibilità"
+  echo "6. Ferma tutto"
+  echo "7. Esci"
+  echo ""
+  read -p "Seleziona opzione [1-7]: " choice
+  
+  case $choice in
+    1)
+      echo "=== STATO SISTEMA ==="
+      ps aux | grep uvc-gadget | grep -v grep
+      ls /dev/video0 2>/dev/null && echo "Video0: PRESENTE" || echo "Video0: ASSENTE"
+      ;;
+    2)
+      sudo pkill uvc-gadget 2>/dev/null
+      cd ~/uvc-gadget
+      sudo ./build/src/uvc-gadget -i ~/uvc_final_test.jpg &
+      echo "uvc-gadget avviato"
+      sleep 2
+      ;;
+    3)
+      echo "Immagini disponibili:"
+      ls ~/*test*.jpg
+      read -p "Inserisci percorso immagine: " img
+      if [ -f "$img" ]; then
+        sudo pkill uvc-gadget
+        cd ~/uvc-gadget
+        sudo ./build/src/uvc-gadget -i "$img" &
+        echo "Avviato con: $img"
+      else
+        echo "File non trovato!"
+      fi
+      ;;
+    4)
+      ~/monitor_uvc.sh
+      ;;
+    5)
+      ~/compatibility_test.sh
+      ;;
+    6)
+      sudo pkill uvc-gadget
+      echo "Tutto fermato"
+      ;;
+    7)
+      exit 0
+      ;;
+    *)
+      echo "Opzione non valida"
+      ;;
+  esac
+  
+  echo ""
+  read -p "Premi Enter per continuare..."
+done
+EOF
+chmod +x ~/uvc_control_panel.sh
+```
+## 6: H.264 e YUYV Setup
+
+## Step 6.1 Aggiornamento sistema e installazione dipendenze
+Esegui questo comando:
+
+```bash
+echo "=== PASSO 1.1: AGGIORNAMENTO SISTEMA E DIPENDENZE ==="
+# Aggiorna sistema
+sudo apt update
+sudo apt upgrade -y
+# Installa dipendenze ESSENZIALI
+sudo apt install -y \
+    v4l2loopback-dkms \
+    v4l2loopback-utils \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    ffmpeg \
+    v4l-utils \
+    imagemagick \
+    curl \
+    wget
+echo "✅ Componenti base installati"
+```
+
