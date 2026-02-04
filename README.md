@@ -569,31 +569,36 @@ cd /home/salim/uvc-gadget && ./build/src/uvc-gadget -i /home/salim/webcam_test.j
 
 **Risoluzione Problemi**
 
-Problema 1: Nessun dispositivo rilevato su Windows
+**Problema 1**: Nessun dispositivo rilevato su Windows
 Soluzione: Assicurati di usare un cavo USB-C che supporta la trasmissione dati (non solo alimentazione)
 
-Problema 2: Dispositivo con punto esclamativo in Gestione dispositivi
+**Problema 2**: Dispositivo con punto esclamativo in Gestione dispositivi
 Soluzione: Windows potrebbe aver bisogno del driver UVC standard (si installa automaticamente)
 
-Problema 3: Immagine non visibile
+**Problema 3**: Immagine non visibile
 Soluzione: Riavvia il Raspberry Pi e verifica il servizio:
 
-bash
+```bash
 sudo systemctl restart uvc-webcam.service
 sudo journalctl -u uvc-webcam.service -n 20
-Problema 4: Uvc-gadget si ferma dopo l'avvio
+```
+
+**Problema 4**: Uvc-gadget si ferma dopo l'avvio
 Descrizione: È normale! uvc-gadget aspetta che un client (PC) si colleghi e inizi a richiedere frame
 
-Verifica: Collega il PC e controlla i log:
+**Verifica**: Collega il PC e controlla i log:
 
-bash
+```bash
 sudo journalctl -u uvc-webcam.service -f
+```
+
 Dovresti vedere richieste di controllo UVC quando colleghi il PC.
 
-📝 Log di Esempio Funzionante
-Quando tutto funziona correttamente, vedrai output simile:
+📝 Log di Funzionante
 
-text
+**Output atteso:**
+
+```bash
 using jpg video source
 Device /dev/video0 opened: fe980000.usb (gadget.0).
 bRequestType a1 bRequest 86 wValue 0400 wIndex 0100 wLength 0001
@@ -605,12 +610,15 @@ Starting video stream.
 /dev/video0: 4 buffers requested.
 /dev/video0: buffer 0 mapped at address 0x7fb81bf000.
 ... (streaming attivo) ...
-⚙️ Configurazioni Avanzate
+```
+
+**⚙️ Configurazioni Avanzate**
+
 Modificare risoluzione video
 Per cambiare la risoluzione dell'immagine di test:
 
-bash
-# Crea immagine 1280x720
+```bash
+#Crea immagine 1280x720
 convert -size 1280x720 gradient:blue-cyan \
   -fill white -stroke black -strokewidth 2 \
   -draw "rectangle 40,40 1240,680" \
@@ -620,48 +628,51 @@ convert -size 1280x720 gradient:blue-cyan \
   -draw "text 0,75 '1280x720 MJPEG'" \
   -draw "text 0,150 '$(date +"%H:%M:%S")'" \
   -quality 90 ~/webcam_test_hd.jpg
-Aggiornare il servizio systemd con nuova immagine
-bash
+```
+
+**Aggiornare il servizio systemd con nuova immagine**
+
+```bash
 sudo systemctl stop uvc-webcam.service
 sudo sed -i 's|/home/salim/webcam_test.jpg|/home/salim/webcam_test_hd.jpg|' /etc/systemd/system/uvc-webcam.service
 sudo systemctl daemon-reload
 sudo systemctl start uvc-webcam.service
-Monitorare lo stato in tempo reale
-bash
-# Monitora i log del servizio
+```
+**Monitorare lo stato in tempo reale**
+
+```bash
+#Monitora i log del servizio
 sudo journalctl -u uvc-webcam.service -f
-
-# Verifica processi
+#Verifica processi
 watch -n 1 "ps aux | grep uvc-gadget | grep -v grep"
-
-# Verifica dispositivi video
+#Verifica dispositivi video
 watch -n 1 "v4l2-ctl --list-devices 2>/dev/null"
-🚀 Setup Permanente
+```
+**Setup Permanente**
 Una volta verificato che tutto funziona:
-
 Il servizio systemd si avvierà automaticamente ad ogni boot
-
 Non è necessario alcun intervento manuale dopo il collegamento al PC
-
 Per fermare temporaneamente il servizio:
 
-bash
+```bash
 sudo systemctl stop uvc-webcam.service
-Per riavviare:
+```
 
-bash
+**Per riavviare**:
+
+```bash
 sudo systemctl restart uvc-webcam.service
-Verifica Finale
+```
+
+**Verifica Finale**
 Prima di considerare il setup completato, esegui:
 
-bash
+```bash
 echo "=== VERIFICA FINALE ==="
 echo "1. Servizio attivo:"
 sudo systemctl is-active uvc-webcam.service
-
 echo -e "\n2. Stato servizio:"
 sudo systemctl status uvc-webcam.service --no-pager -l | head -20
-
 echo -e "\n3. Dispositivo video disponibile:"
 if [ -e /dev/video0 ]; then
     echo "✅ /dev/video0 presente"
@@ -669,6 +680,6 @@ if [ -e /dev/video0 ]; then
 else
     echo "❌ /dev/video0 non trovato"
 fi
-
 echo -e "\n4. UDC disponibile:"
 ls /sys/class/udc/ 2>/dev/null && echo "✅ UDC configurato" || echo "❌ UDC non trovato"
+```
