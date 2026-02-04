@@ -548,45 +548,52 @@ Prova con l'app Fotocamera di Windows, Zoom, Teams, OBS Studio, ecc.
 
 Comandi per riavviare il servizio (se necessario):
 
-## Step 3.7: Creazione del Servizio Systemd (Setup Permanente)
+## Risoluzione Problemiù
 
-**Descrizione:** Creiamo un file di servizio per fare in modo che la webcam si avvii automaticamente ogni volta che accendi il Raspberry Pi, senza dover digitare i comandi a mano. Questo metodo è più affidabile del vecchio rc.local.
+**Problema:** PC non riconosce il dispositivo
 
-**1. Crea il file di servizio: Copia e incolla tutto questo blocco nel terminale:**
-
-```Bash
-sudo bash -c "cat <<EOF > /etc/systemd/system/uvc-webcam.service
-[Unit]
-Description=Raspberry Pi UVC Webcam Gadget
-After=network.target
-[Service]
-Type=simple
-# Carica il modulo kernel prima di avviare il programma
-ExecStartPre=/usr/sbin/modprobe g_webcam
-# Avvia uvc-gadget
-ExecStart=/home/$USER/uvc-gadget/build/src/uvc-gadget -i /home/$USER/webcam_test.jpg fe980000.usb
-Restart=always
-RestartSec=5
-[Install]
-WantedBy=multi-user.target
-EOF"
+```bash
+#Verifica processo uvc-gadget
+ps aux | grep uvc-gadget
+# Controlla log
+sudo journalctl -u uvc-webcam.service -n 20
+# Verifica messaggi kernel
+dmesg | tail -20 | grep -i "usb\|uvc\|gadget"
 ```
 
-**2. Attiva e avvia il servizio:**
-
-```Bash
-#Ricarica la lista dei servizi
-sudo systemctl daemon-reload
-
-#Abilita il servizio all'avvio automatico
-sudo systemctl enable uvc-webcam.service
-
-#Avvia il servizio immediatamente
-sudo systemctl start uvc-webcam.service
+**Problema:** Immagine non visibile
+```bash
+#Riavvia uvc-gadget
+sudo pkill uvc-gadget
+cd ~/uvc-gadget
+sudo ./build/src/uvc-gadget -i ~/test_image.jpg &
+# Crea nuova immagine di test
+convert -size 640x480 xc:red \
+    -fill white -pointsize 36 -gravity center \
+    -draw "text 0,0 'TEST ROSSO'" \
+    ~/test_red.jpg
 ```
 
-**3. Verifica lo stato:**
+**Problema:** Video laggato
+Usa un cavo USB-C di qualità (almeno USB 2.0 High Speed)
+Riduci la qualità dell'immagine:
 
-```Bash
-sudo systemctl status uvc-webcam.service
+```bash
+convert -size 640x480 xc:blue \
+    -fill white -pointsize 36 -gravity center \
+    -draw "text 0,0 'UVC TEST'" \
+    -quality 80 ~/test_low_quality.jpg
+```
+
+**Configurazione Ottimizzata per RPi4**
+
+```bash
+# Aggiungi al file /boot/firmware/config.txt
+cat << EOF | sudo tee -a /boot/firmware/config.txt
+# Ottimizzazioni UVC
+gpu_mem=256
+dtparam=audio=off
+max_usb_current=1
+disable_splash=1
+EOF
 ```
