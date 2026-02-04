@@ -1375,7 +1375,7 @@ cat > ~/README_FINALE_10_10.md << 'EOF'
 ./uvc_10_10.sh test
 ```
 
- **VERIFICA PER mostrare : **
+ **VERIFICA PER MOSTRARE : **
 
 ```bash
 # 1. Mostra che tutti i dispositivi funzionano
